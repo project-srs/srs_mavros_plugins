@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<library path="srs_mavros_plugins">
+  <class name="led_control" type="mavros::plugin::PluginFactoryTemplate&lt;srs_mavros_plugins::LedControlPlugin&gt;" base_class_type="mavros::plugin::PluginFactory">
+    <description>led control plugins</description>
+  </class>
+
+  <class name="play_tune_v1" type="mavros::plugin::PluginFactoryTemplate&lt;srs_mavros_plugins::PlayTuneV1Plugin&gt;" base_class_type="mavros::plugin::PluginFactory">
+    <description>play tune v1 control plugins</description>
+  </class>
+
+  <class name="velocity_position" type="mavros::plugin::PluginFactoryTemplate&lt;srs_mavros_plugins::VelocityPositionPlugin&gt;" base_class_type="mavros::plugin::PluginFactory">
+    <description>velocity position control plugins</description>
+  </class>
+</library>
