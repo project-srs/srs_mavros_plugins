@@ -3,21 +3,23 @@
 #include "mavros/plugin_filter.hpp"
 #include "std_msgs/msg/color_rgba.hpp"
 
-namespace srs_mavros_plugins {
+namespace srs_mavros_plugins
+{
 
-class LedControlPlugin : public mavros::plugin::Plugin {
- public:
-  explicit LedControlPlugin(mavros::plugin::UASPtr uas_)
-      : Plugin(uas_, "led_control") {
+class LedControlPlugin : public mavros::plugin::Plugin
+{
+public:
+  explicit LedControlPlugin(mavros::plugin::UASPtr uas_) : Plugin(uas_, "led_control")
+  {
     color_led_sub_ = node->create_subscription<std_msgs::msg::ColorRGBA>(
-        "~/color", 10,
-        std::bind(&LedControlPlugin::onColorData, this, std::placeholders::_1));
+      "~/color", 10, std::bind(&LedControlPlugin::onColorData, this, std::placeholders::_1));
   }
 
   Subscriptions get_subscriptions() override { return {}; }
 
- private:
-  void onColorData(const std_msgs::msg::ColorRGBA::SharedPtr color) {
+private:
+  void onColorData(const std_msgs::msg::ColorRGBA::SharedPtr color)
+  {
     mavlink::ardupilotmega::msg::LED_CONTROL msg = {};
     uas->msg_set_target(msg);
     msg.instance = 255;
@@ -29,8 +31,7 @@ class LedControlPlugin : public mavros::plugin::Plugin {
     uas->send_message(msg);
   }
 
-  rclcpp::Subscription<std_msgs::msg::ColorRGBA>::SharedPtr color_led_sub_{
-      nullptr};
+  rclcpp::Subscription<std_msgs::msg::ColorRGBA>::SharedPtr color_led_sub_{nullptr};
 };
 
 }  // namespace srs_mavros_plugins
