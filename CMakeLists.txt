@@ -23,6 +23,7 @@ add_library(${PROJECT_NAME} SHARED
   src/led_control.cpp
   src/velocity_position.cpp
   src/play_tune_v1.cpp
+  src/rc_joy.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME}
