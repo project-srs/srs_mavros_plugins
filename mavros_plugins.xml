@@ -15,4 +15,12 @@
   <class name="rc_joy" type="mavros::plugin::PluginFactoryTemplate&lt;srs_mavros_plugins::RcJoyPlugin&gt;" base_class_type="mavros::plugin::PluginFactory">
     <description>joy plugins</description>
   </class>
+
+  <class name="reboot" type="mavros::plugin::PluginFactoryTemplate&lt;srs_mavros_plugins::RebootPlugin&gt;" base_class_type="mavros::plugin::PluginFactory">
+    <description>reboot plugins</description>
+  </class>
+
+  <class name="setup" type="mavros::plugin::PluginFactoryTemplate&lt;srs_mavros_plugins::SetupPlugin&gt;" base_class_type="mavros::plugin::PluginFactory">
+    <description>setup plugins</description>
+  </class>
 </library>

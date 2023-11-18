@@ -14,9 +14,10 @@ find_package(pluginlib REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-find_package(geometry_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
@@ -24,6 +25,8 @@ add_library(${PROJECT_NAME} SHARED
   src/velocity_position.cpp
   src/play_tune_v1.cpp
   src/rc_joy.cpp
+  src/reboot.cpp
+  src/setup.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME}
@@ -35,6 +38,7 @@ ament_target_dependencies(${PROJECT_NAME}
   tf2_ros
   # use in plugins
   std_msgs
+  std_srvs
   sensor_msgs
   nav_msgs
   tf2_geometry_msgs
