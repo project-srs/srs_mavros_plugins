@@ -32,10 +32,12 @@ private:
 
     if (8 <= channels.chancount) {
       // axes
-      output.axes.push_back(decodeStick(channels.chan1_raw));
-      output.axes.push_back(decodeStick(channels.chan2_raw));
-      output.axes.push_back(decodeStick(channels.chan3_raw));
-      output.axes.push_back(decodeStick(channels.chan4_raw));
+      output.axes.push_back(-decodeStick(channels.chan4_raw)); // left-horizontal
+      output.axes.push_back(decodeStick(channels.chan2_raw)); // left-vertical
+      output.axes.push_back(0.0f);
+      output.axes.push_back(-decodeStick(channels.chan1_raw)); // right-horizon
+      output.axes.push_back(decodeStick(channels.chan3_raw)); // right-vertical
+      output.axes.push_back(0.0f);
       // buttons
       output.buttons.push_back(decode_2pos(channels.chan5_raw));
       output.buttons.push_back(get_9pos_hi(channels.chan6_raw));
