@@ -13,8 +13,6 @@ class SetupPlugin : public mavros::plugin::Plugin
 public:
   explicit SetupPlugin(mavros::plugin::UASPtr uas_) : Plugin(uas_, "setup")
   {
-    RCLCPP_INFO(get_logger(), "#####################");
-    RCLCPP_INFO(get_logger(), "#####################");
     start_stamp_ = uas_->now();
 
     armed_pub_ = node->create_publisher<std_msgs::msg::Bool>("~/armed", 1);
