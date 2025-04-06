@@ -1,4 +1,5 @@
 #include <geometry_msgs/msg/pose2_d.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
 #include <mavros/mavros_uas.hpp>
 #include <mavros/plugin.hpp>
 #include <mavros/plugin_filter.hpp>
@@ -16,7 +17,7 @@ public:
 
     // header frame_id.
     // default to map (world-fixed, ENU as per REP-105).
-    node_declare_and_watch_parameter("frame_id", "map", [&](const rclcpp::Parameter & p) {
+    node_declare_and_watch_parameter("frame_id", "odom", [&](const rclcpp::Parameter & p) {
       frame_id_ = p.as_string();
       RCLCPP_INFO(get_logger(), "frame_id %s", frame_id_.c_str());
     });
@@ -26,7 +27,7 @@ public:
     node_declare_and_watch_parameter(
       "tf.send", false, [&](const rclcpp::Parameter & p) { tf_send_ = p.as_bool(); });
     node_declare_and_watch_parameter(
-      "tf.frame_id", "map", [&](const rclcpp::Parameter & p) { tf_frame_id_ = p.as_string(); });
+      "tf.frame_id", "odom", [&](const rclcpp::Parameter & p) { tf_frame_id_ = p.as_string(); });
     node_declare_and_watch_parameter(
       "tf.child_frame_id", "base_link",
       [&](const rclcpp::Parameter & p) { tf_child_frame_id_ = p.as_string(); });
@@ -48,57 +49,69 @@ public:
     const mavlink::mavlink_message_t * msg [[maybe_unused]],
     mavlink::common::msg::LOCAL_POSITION_NED & pos_ned,
     mavros::plugin::filter::SystemAndOk filter [[maybe_unused]])
-  {
-    // generate body_twist
-    geometry_msgs::msg::Twist body_twist;
-    float euler_enu_roll = 0.0f;
-    float euler_enu_pitch = 0.0f;
-    if (imu_rpy_enu_) {
-      const float vel_enu_x = pos_ned.vy;
-      const float vel_enu_y = pos_ned.vx;
-      euler_enu_roll = imu_rpy_enu_.value()[0];
-      euler_enu_pitch = imu_rpy_enu_.value()[1];
-      const float euler_enu_yaw = imu_rpy_enu_.value()[2];
-      body_twist.linear.x =
-        std::cos(-euler_enu_yaw) * vel_enu_x - std::sin(-euler_enu_yaw) * vel_enu_y;
-      body_twist.linear.y =
-        std::sin(-euler_enu_yaw) * vel_enu_x + std::cos(-euler_enu_yaw) * vel_enu_y;
-      body_twist.linear.z = -pos_ned.vz;
-    }
-    if (imu_gyro_flu_) {
-      body_twist.angular.x = imu_gyro_flu_.value()[0];
-      body_twist.angular.y = imu_gyro_flu_.value()[1];
-      if (wheel_yaw_rate_) {
-        const float gyro_yaw_rate = imu_gyro_flu_.value()[2];
-        const float gyro_marge_rate =
-          std::min(std::max((std::fabs(gyro_yaw_rate) - 0.02f) / (0.5f - 0.02f), 0.0f), 1.0f);
-        body_twist.angular.z =
-          gyro_marge_rate * gyro_yaw_rate + (1 - gyro_marge_rate) * wheel_yaw_rate_.value();
-      } else {
-        body_twist.angular.z = imu_gyro_flu_.value()[2];
-      }
-    }
-    const float pose_enu_z = -pos_ned.z;
+  {  
+    geometry_msgs::msg::Point lpos_position_enu;
+    lpos_position_enu.x = pos_ned.y;
+    lpos_position_enu.y = pos_ned.x;
+    lpos_position_enu.z = -pos_ned.z;
+    lpos_position_enu_ = lpos_position_enu;
 
-    if (last_stamp_) {
-      // update 2d pose
-      auto duration = (pos_ned.time_boot_ms - last_stamp_.value()) / 1000.0f;
-      last_pose_2d_ = update2dPose(last_pose_2d_, body_twist, duration);
-      // generate odometry msg
-      nav_msgs::msg::Odometry odom;
-      odom.header = uas->synchronized_header(frame_id_, pos_ned.time_boot_ms);
-      odom.child_frame_id = tf_child_frame_id_;
-      odom.pose.pose =
-        generateVelocityPose3D(last_pose_2d_, pose_enu_z, euler_enu_roll, euler_enu_pitch);
-      odom.twist.twist = body_twist;
-      local_odom_->publish(odom);
-      // broadcast TF
-      if (tf_send_) {
-        geometry_msgs::msg::TransformStamped transform = generateTransform(odom);
-        uas->tf2_broadcaster.sendTransform(transform);
-      }
-    }
-    last_stamp_ = pos_ned.time_boot_ms;
+    geometry_msgs::msg::Vector3 lpos_velocity_enu;
+    lpos_velocity_enu.x = pos_ned.vy;
+    lpos_velocity_enu.y = pos_ned.vx;
+    lpos_velocity_enu.z = -pos_ned.vz;
+    lpos_velocity_enu_ = lpos_velocity_enu;
+
+    // // generate body_twist
+    // geometry_msgs::msg::Twist body_twist;
+    // float euler_enu_roll = 0.0f;
+    // float euler_enu_pitch = 0.0f;
+    // if (imu_rpy_enu_) {
+    //   const float vel_enu_x = pos_ned.vy;
+    //   const float vel_enu_y = pos_ned.vx;
+    //   euler_enu_roll = imu_rpy_enu_.value()[0];
+    //   euler_enu_pitch = imu_rpy_enu_.value()[1];
+    //   const float euler_enu_yaw = imu_rpy_enu_.value()[2];
+    //   body_twist.linear.x =
+    //     std::cos(-euler_enu_yaw) * vel_enu_x - std::sin(-euler_enu_yaw) * vel_enu_y;
+    //   body_twist.linear.y =
+    //     std::sin(-euler_enu_yaw) * vel_enu_x + std::cos(-euler_enu_yaw) * vel_enu_y;
+    //   body_twist.linear.z = -pos_ned.vz;
+    // }
+    // if (imu_gyro_flu_) {
+    //   body_twist.angular.x = imu_gyro_flu_.value()[0];
+    //   body_twist.angular.y = imu_gyro_flu_.value()[1];
+    //   if (wheel_yaw_rate_) {
+    //     const float gyro_yaw_rate = imu_gyro_flu_.value()[2];
+    //     const float gyro_marge_rate =
+    //       std::min(std::max((std::fabs(gyro_yaw_rate) - 0.02f) / (0.5f - 0.02f), 0.0f), 1.0f);
+    //     body_twist.angular.z =
+    //       gyro_marge_rate * gyro_yaw_rate + (1 - gyro_marge_rate) * wheel_yaw_rate_.value();
+    //   } else {
+    //     body_twist.angular.z = imu_gyro_flu_.value()[2];
+    //   }
+    // }
+    // const float pose_enu_z = -pos_ned.z;
+
+    // if (last_stamp_) {
+    //   // update 2d pose
+    //   auto duration = (pos_ned.time_boot_ms - last_stamp_.value()) / 1000.0f;
+    //   last_pose_2d_ = update2dPose(last_pose_2d_, body_twist, duration);
+    //   // generate odometry msg
+    //   nav_msgs::msg::Odometry odom;
+    //   odom.header = uas->synchronized_header(frame_id_, pos_ned.time_boot_ms);
+    //   odom.child_frame_id = tf_child_frame_id_;
+    //   odom.pose.pose =
+    //     generateVelocityPose3D(last_pose_2d_, pose_enu_z, euler_enu_roll, euler_enu_pitch);
+    //   odom.twist.twist = body_twist;
+    //   local_odom_->publish(odom);
+    //   // broadcast TF
+    //   if (tf_send_) {
+    //     geometry_msgs::msg::TransformStamped transform = generateTransform(odom);
+    //     uas->tf2_broadcaster.sendTransform(transform);
+    //   }
+    // }
+    // last_stamp_ = pos_ned.time_boot_ms;
   }
 
   void handle_attitude(
@@ -107,7 +120,13 @@ public:
   {
     // gyro rate
     Eigen::Vector3d gyro_frd = Eigen::Vector3d(att.rollspeed, att.pitchspeed, att.yawspeed);
-    imu_gyro_flu_ = mavros::ftf::transform_frame_aircraft_baselink(gyro_frd);
+    Eigen::Vector3d gyro_flu = mavros::ftf::transform_frame_aircraft_baselink(gyro_frd);
+    geometry_msgs::msg::Vector3 imu_gyro_flu;
+    imu_gyro_flu.x = gyro_flu[0];
+    imu_gyro_flu.y = gyro_flu[1];
+    imu_gyro_flu.z = gyro_flu[2];
+    imu_gyro_flu_ = imu_gyro_flu;
+
     // orientation rpy
     imu_rpy_enu_ = Eigen::Vector3d(att.roll, -att.pitch, M_PI / 2 - att.yaw);
   }
@@ -123,13 +142,44 @@ public:
     }
 
     if (last_wheel_distance_) {
-      const float wheel_distance = 0.340f;
+      const float wheel_distance = 0.362f;
       const float diff_wheel_0 = wheel_dist.distance[0] - last_wheel_distance_.value().distance[0];
       const float diff_wheel_1 = wheel_dist.distance[1] - last_wheel_distance_.value().distance[1];
-      const float diff_stamp =
-        (wheel_dist.time_usec - last_wheel_distance_.value().time_usec) / 1000000.0f;
+      const float diff_stamp = (wheel_dist.time_usec - last_wheel_distance_.value().time_usec) / 1000000.0f;
       if (0.001f < diff_stamp) {
-        wheel_yaw_rate_ = (-diff_wheel_0 + diff_wheel_1) / wheel_distance / diff_stamp;
+        const float wheel_yaw_rate = (-diff_wheel_0 + diff_wheel_1) / wheel_distance / diff_stamp;
+        const float wheel_front_vel = (diff_wheel_0 + diff_wheel_1) / 2 / diff_stamp;
+        // RCLCPP_INFO(get_logger(), "(%f) %f %f", diff_stamp, wheel_front_vel, wheel_yaw_rate_.value());
+
+        // update 2d pose
+        last_pose_2d_ = update2dPose(last_pose_2d_, wheel_front_vel, wheel_yaw_rate, diff_stamp);
+      }
+
+      // generate odometry msg
+      nav_msgs::msg::Odometry odom;
+      odom.header.frame_id = frame_id_;
+      odom.header.stamp = uas->synchronise_stamp(wheel_dist.time_usec);
+      odom.child_frame_id = tf_child_frame_id_;
+      // set pose
+      if (imu_rpy_enu_.has_value() && lpos_position_enu_.has_value()) {
+        odom.pose.pose = generateVelocityPose3D(last_pose_2d_, lpos_position_enu_.value().z, imu_rpy_enu_.value()[0], imu_rpy_enu_.value()[1]);
+      } else {
+        odom.pose.pose = generateVelocityPose3D(last_pose_2d_, 0.0f, 0.0f, 0.0f);
+      }
+      // set twist
+      if (imu_rpy_enu_.has_value() && imu_gyro_flu_.has_value() && lpos_velocity_enu_.has_value()) {
+        geometry_msgs::msg::Twist body_twist;
+        const float euler_enu_yaw = imu_rpy_enu_.value()[2];
+        body_twist.linear.x = std::cos(-euler_enu_yaw) * lpos_velocity_enu_.value().x - std::sin(-euler_enu_yaw) * lpos_velocity_enu_.value().y;
+        body_twist.linear.y = std::sin(-euler_enu_yaw) * lpos_velocity_enu_.value().x + std::cos(-euler_enu_yaw) * lpos_velocity_enu_.value().y;
+        body_twist.linear.z = lpos_velocity_enu_.value().z;
+        body_twist.angular = imu_gyro_flu_.value();
+        odom.twist.twist = body_twist;
+      }
+      local_odom_->publish(odom);
+      if (tf_send_) {
+        geometry_msgs::msg::TransformStamped transform = generateTransform(odom);
+        uas->tf2_broadcaster.sendTransform(transform);
       }
     }
     last_wheel_distance_ = wheel_dist;
@@ -150,6 +200,21 @@ private:
     output.x = pose_2d_enu.x + vpos_vel_x * dt;
     output.y = pose_2d_enu.y + vpos_vel_y * dt;
     output.theta = pose_2d_enu.theta + twist_2d_frd.angular.z * dt;
+    return output;
+  }
+
+  static geometry_msgs::msg::Pose2D update2dPose(
+    const geometry_msgs::msg::Pose2D & pose_2d_enu, const float front_vel, const float yaw_rate,
+    const float dt)
+  {
+    float vpos_half_yaw = pose_2d_enu.theta + yaw_rate * dt / 2.0f;
+    float vpos_vel_x = std::cos(vpos_half_yaw) * front_vel;
+    float vpos_vel_y = std::sin(vpos_half_yaw) * front_vel;
+
+    geometry_msgs::msg::Pose2D output;
+    output.x = pose_2d_enu.x + vpos_vel_x * dt;
+    output.y = pose_2d_enu.y + vpos_vel_y * dt;
+    output.theta = pose_2d_enu.theta + yaw_rate * dt;
     return output;
   }
 
@@ -203,10 +268,16 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr local_odom_{nullptr};
 
   geometry_msgs::msg::Pose2D last_pose_2d_;
-  std::optional<uint64_t> last_stamp_;
+
+  // from attitude
   std::optional<Eigen::Vector3d> imu_rpy_enu_;
-  std::optional<Eigen::Vector3d> imu_gyro_flu_;
-  std::optional<float> wheel_yaw_rate_;
+  std::optional<geometry_msgs::msg::Vector3> imu_gyro_flu_;
+
+  // from local_position
+  std::optional<geometry_msgs::msg::Point> lpos_position_enu_;
+  std::optional<geometry_msgs::msg::Vector3> lpos_velocity_enu_;
+  
+  // from wheel_distance
   std::optional<mavlink::common::msg::WHEEL_DISTANCE> last_wheel_distance_;
 
   // options set by parameter
